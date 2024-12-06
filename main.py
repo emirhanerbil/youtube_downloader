@@ -9,31 +9,58 @@ from pytubefix.exceptions import VideoUnavailable,AgeRestrictedError,VideoPrivat
 import os
 from pathlib import Path
 
-def download(link):
-    if "list" in link:
-        music = Playlist(link)
-    else:
-        music = YouTube(link)
+
+def download_single_video(yt, output_path="sounds"):
+    """Tek bir videoyu indirmek için yardımcı fonksiyon"""
+    try:
+        stream = yt.streams.get_audio_only()
+        audio_file_name = f"{yt.title}.wav"
+        stream.download(filename=audio_file_name, output_path=output_path)
+        print(f"'{yt.title}' başarıyla indirildi")
+        return {"id": yt.video_id, "title": yt.title}
+    except (AgeRestrictedError, VideoPrivate, VideoUnavailable, RegexMatchError) as e:
+        handle_error(e, yt.watch_url if hasattr(yt, 'watch_url') else "")
+        return None
+
+def handle_error(error, link=""):
+    """Hata mesajlarını yönetmek için yardımcı fonksiyon"""
+    error_messages = {
+        AgeRestrictedError: "Video yaş kısıtlamalıdır.",
+        VideoPrivate: "Video gizlidir",
+        VideoUnavailable: f"{link} : {str(error)}",
+        RegexMatchError: "Yanlış formatta link girdiniz. Lütfen tekrar deneyiniz."
+    }
+    print(error_messages.get(type(error), f"Beklenmeyen hata: {str(error)}"))
+
+def download(link, output_path="sounds"):
+    """Ana indirme fonksiyonu"""
     music_list = []
-    for link in music:
-        infos = {}
-        yt = YouTube(link,use_oauth=False,allow_oauth_cache=True)
-        try:
-            stream = yt.streams.get_audio_only()
-            audio_file_name = f"{yt.title}.wav"
-            stream.download(filename = audio_file_name,output_path="sounds")
-            print("Download is completed successfully") 
-            infos["id"] = yt.video_id
-            infos["title"] = yt.title
-            music_list.append(infos)
-        except AgeRestrictedError as e:
-            print("Video yaş kısıtlamalıdır.")   
-        except VideoPrivate as e:
-            print("Video gizlidir")
-        except VideoUnavailable as e:
-            print(f"{link} : {e}")
-        except RegexMatchError as e:
-            print("Yanlış formatta link girdiniz. Lütfen tekrar deneyiz.")
+    
+    try:
+        if "list" in link:
+            playlist = Playlist(link)
+            for video_link in playlist:
+                yt = YouTube(
+                    video_link,
+                    use_oauth=False,
+                    allow_oauth_cache=True
+                )
+                result = download_single_video(yt, output_path)
+                if result:
+                    music_list.append(result)
+        else:
+            yt = YouTube(
+                link,
+                use_oauth=False,
+                allow_oauth_cache=True
+            )
+            result = download_single_video(yt, output_path)
+            if result:
+                music_list.append(result)
+                
+    except Exception as e:
+        print(f"Beklenmeyen bir hata oluştu: {str(e)}")
+    
     return music_list
 
 # Geçici dosyalar için klasör oluştur
