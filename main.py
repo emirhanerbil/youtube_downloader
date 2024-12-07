@@ -17,10 +17,10 @@ def download_single_video(yt, output_path="sounds"):
         audio_file_name = f"{yt.title}.wav"
         stream.download(filename=audio_file_name, output_path=output_path)
         print(f"'{yt.title}' başarıyla indirildi")
-        return {"id": yt.video_id, "title": yt.title}
+        return {"id": yt.video_id, "title": yt.title,"success" : True}
     except (AgeRestrictedError, VideoPrivate, VideoUnavailable, RegexMatchError) as e:
         handle_error(e, yt.watch_url if hasattr(yt, 'watch_url') else "")
-        return None
+        return {"id": yt.video_id, "title": yt.title,"success": False}
 
 def handle_error(error, link=""):
     """Hata mesajlarını yönetmek için yardımcı fonksiyon"""
@@ -35,7 +35,7 @@ def handle_error(error, link=""):
 def download(link, output_path="sounds"):
     """Ana indirme fonksiyonu"""
     music_list = []
-    
+    unavailable_music_list = []
     try:
         if "list" in link:
             playlist = Playlist(link)
@@ -46,8 +46,10 @@ def download(link, output_path="sounds"):
                     allow_oauth_cache=True
                 )
                 result = download_single_video(yt, output_path)
-                if result:
+                if result["success"] == True:
                     music_list.append(result)
+                else:
+                    unavailable_music_list.append(result)
         else:
             yt = YouTube(
                 link,
@@ -55,13 +57,15 @@ def download(link, output_path="sounds"):
                 allow_oauth_cache=True
             )
             result = download_single_video(yt, output_path)
-            if result:
+            if result["success"] == True:
                 music_list.append(result)
+            else:
+                unavailable_music_list.append(result)
                 
     except Exception as e:
         print(f"Beklenmeyen bir hata oluştu: {str(e)}")
     
-    return music_list
+    return music_list,unavailable_music_list
 
 # Geçici dosyalar için klasör oluştur
 TEMP_DIR = Path("temp_downloads")
@@ -83,10 +87,12 @@ def home(request: Request):
 async def get_music_list(request: Request, link: str = Form(...)):
     try:
         # Verilen download fonksiyonunu kullan
-        music_list = download(link)
+        music_list,unavailable_music_list = download(link)
+        print(music_list,"--------",unavailable_music_list)
         return templates.TemplateResponse("index.html", {
             "request": request,
             "music_list": music_list,
+            "unavailable_music_list" : unavailable_music_list,
             "success": True
         })
     except Exception as e:
@@ -94,6 +100,7 @@ async def get_music_list(request: Request, link: str = Form(...)):
             "request": request,
             "error": str(e),
             "music_list": [],
+            "unavailable_music_list" : unavailable_music_list,
             "success": False
         })
 
