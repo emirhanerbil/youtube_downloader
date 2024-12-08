@@ -13,7 +13,7 @@ from pathlib import Path
 def download_single_video(yt, output_path="sounds"):
     """Tek bir videoyu indirmek için yardımcı fonksiyon"""
     try:
-        stream = yt.streams.get_audio_only()
+        stream = yt.get_highest_resolution(progressive=False)
         audio_file_name = f"{yt.title}.wav"
         stream.download(filename=audio_file_name, output_path=output_path)
         print(f"'{yt.title}' başarıyla indirildi")
